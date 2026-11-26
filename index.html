@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Сундучок сокровищ чёрного кота</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: linear-gradient(160deg, #1a0b2e, #3a1c5a); 
+    font-family: system-ui, -apple-system, sans-serif;
+    touch-action: none; user-select: none; color: #fff;
+    overflow: hidden;
+  }
+  
+  .screen { display: none; flex-direction: column; align-items: center; width: 100%; height: 100vh; justify-content: center; position: relative; }
+  .screen.active { display: flex; }
+
+  #music-btn { 
+    position: fixed; top: 15px; right: 15px; z-index: 1000;
+    background: rgba(0,0,0,0.6); border: 2px solid #ffd700; border-radius: 50%; 
+    width: 45px; height: 45px; font-size: 20px; cursor: pointer; 
+    d
+isplay: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 10px rgba(255,215,0,0.5);
+  }
+
+  /* Меню */
+  .characters { display: flex; gap: 40px; margin-bottom: 20px; font-size: 70px; }
+  .cat { animation: float 2s ease-in-out infinite; }
+  .mouse-menu { animation: float 2.5s ease-in-out infinite reverse; font-size: 45px; margin-top: 20px;}
+  @keyframes float { 0% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-15px) rotate(5deg); } 100% { transform: translateY(0px) rotate(0deg); } }
+  
+  #menu h1 { font-size: 28px; text-align: center; margin-bottom: 10px; color: #ffd700; text-shadow: 2px 2px 4px #000; padding: 0 20px;}
+  #menu p { font-size: 16px; color: #d1c4e9; margin-bottom: 30px; text-align: center; padding: 0 20px; }
+  
+  .btn { padding: 12px 30px; border: none; border-radius: 25px; background: linear-gradient(135deg, #ffd700, #ffb347); color: #2b1b3d; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 0 #b38f00; transition: transform 0.1
+s; }
+  .btn:active { transform: translateY(4px); box-shadow: none; }
+
+  /* Карта */
+  #map-screen h2 { margin-bottom: 20px; color: #ffd700; text-shadow: 2px 2px 4px #000;}
+  #level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-width: 400px; width: 90%; max-height: 60vh; overflow-y: auto; padding: 10px; }
+  .level-btn { aspect-ratio: 1/1; border-radius: 50%; border: 2px solid #ffd700; background: rgba(74, 44, 90, 0.8); color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 0 rgba(0,0,0,0.5);}
+  .level-btn.locked { opacity: 0.4; cursor: not-allowed; box-shadow: none; border-color: #666;}
+  .level-btn.done { background: linear-gradient(135deg, #2ecc71, #27ae60); border-color: #fff; box-shadow: 0 4px 0 #1e8449;}
+
+  /* Игровой экран */
+  #game-screen { color: #fff; justify-content: center; padding: 10px; transition: background-image 0.5s ease; gap: 10px;}
+  #game-screen::before { content: ""; pos
+ition: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 0; }
+  #game-hud, #board-container, #msg, #controls { position: relative; z-index: 1; }
+
+  /* Стильный HUD */
+  #game-hud { 
+    display: flex; justify-content: space-between; align-items: center; 
+    background: linear-gradient(180deg, rgba(60,30,80,0.95), rgba(30,15,45,0.95)); 
+    border: 2px solid #ffd700; border-radius: 15px;
+    padding: 8px 15px; width: min(95vw, 650px); font-weight: bold; 
+    box-shadow: 0 5px 15px rgba(0,0,0,0.6), inset 0 2px 5px rgba(255,255,255,0.1);
+  }
+  .hud-item { display: flex; flex-direction: column; align-items: center; font-size: 12px; color: #d1c4e9;}
+  .hud-val { font-size: 18px; color: #ffd700; }
+  #goal { background: rgba(196, 122, 43, 0.5); padding: 4px 12px; border-radius: 10px; border: 1px solid #ffd700; font-size: 16px; color: #fff;}
+  
+  /* Увеличенное поле */
+  #board-container { position: relative; flex-grow: 1; display: flex; align-items: center; justify-content: cente
+r; width: 100%;}
+  #board { 
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; padding: 8px; 
+    background: rgba(20, 10, 30, 0.9); border-radius: 18px; 
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.9), 0 10px 30px rgba(0,0,0,.7); 
+    border: 3px solid #ffd700; 
+    width: min(95vw, 70vh, 600px); aspect-ratio: 1 / 1; 
+  }
+  
+  /* Стильные клетки с эффектом 3D */
+  .cell { 
+    display: flex; align-items: center; justify-content: center; 
+    background: linear-gradient(135deg, #f7f1e3, #d1ccc0); 
+    border-radius: 10px; font-size: clamp(18px, 5vh, 40px); cursor: pointer; 
+    transition: transform 0.15s, opacity 0.15s; position: relative; overflow: hidden;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2), 0 2px 2px rgba(0,0,0,0.3);
+  }
+  .cell.swapping { transform: scale(0.8) rotate(10deg); opacity: 0.7; z-index: 10;}
+
+  /* Спец-фишки */
+  .ice-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(150, 220, 255, 0.8); border: 2px solid #fff; display: flex
+; align-items: center; justify-content: center; font-size: 24px; z-index: 3; border-radius: 8px;}
+  .cell.special { box-shadow: 0 0 15px 3px #fff inset, 0 0 10px rgba(255,255,255,0.8); }
+  .cell.bomb { background: linear-gradient(135deg, #ff9999, #cc0000); }
+  .cell.rainbow { background: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet); }
+  .cell.rocket-h { background: linear-gradient(135deg, #74ebd5, #9face6); }
+  .cell.rocket-v { background: linear-gradient(135deg, #ff9a9e, #fecfef); }
+  
+  .cell.sel { transform: scale(1.15); box-shadow: 0 0 0 3px #fff inset, 0 0 20px #ffd700; z-index: 2; background: #fff;}
+  .cell.hint { animation: hintPulse 1s infinite; border: 3px solid #ffd700; z-index: 2;}
+  @keyframes hintPulse { 0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 215, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); } }
+  .cell.pop { animation: popAnim 0.3s ease-out forwards; }
+  @keyframes popAnim { 0% { transform: scale(1); } 50
+% { transform: scale(1.3); filter: brightness(1.5); } 100% { transform: scale(0) rotate(90deg); opacity: 0; } }
+  
+  #floating-mouse {
+      display: none; position: absolute; font-size: 40px; z-index: 10;
+      pointer-events: none; filter: drop-shadow(2px 2px 4px #000);
+      transition: left 0.3s ease, top 0.3s ease;
+      animation: mouseBounce 0.5s infinite alternate;
+  }
+  @keyframes mouseBounce { from { transform: translateY(0); } to { transform: translateY(-15px); } }
+
+  /* Управление */
+  #controls { display: flex; gap: 15px; align-items: center; justify-content: center; width: 100%; margin-top: 5px;}
+  .action-btn { border: 3px solid #ffd700; border-radius: 50%; width: 65px; height: 65px; font-size: 30px; cursor: pointer; transition: 0.1s; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 5px 10px rgba(0,0,0,0.6); background: linear-gradient(135deg, #4a2c5a, #2b1b3d);}
+  .action-btn:active { transform: scale(0.9); box-shadow: none;}
+  .ac
+tion-btn.active { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 0 20px #2ecc71; }
+  .action-btn:disabled { opacity: 0.5; filter: grayscale(100%); cursor: not-allowed; }
+
+  #msg { margin-top: 5px; height: 25px; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 2px #000; color: #ffd700; text-align: center;}
+  
+  /* Магазин */
+  #shop-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; }
+  #shop-content { background: linear-gradient(180deg, #3a1c5a, #1a0b2e); border: 3px solid #ffd700; border-radius: 20px; padding: 20px; text-align: center; width: 80%; max-width: 300px; box-shadow: 0 0 30px rgba(255,215,0,0.3);}
+  #shop-content h3 { color: #ffd700; margin-top: 0; font-size: 22px;}
+  .buy-btn { margin-top: 15px; background: linear-gradient(135deg, #2ecc71, #27ae60); color: white; border: 2px solid #fff; padding: 10px 20px; border-radius: 15px; font-size: 16px; fo
+nt-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 0 #1e8449;}
+  .buy-btn:active { transform: translateY(4px); box-shadow: none;}
+  .buy-btn:disabled { background: #7f8c8d; box-shadow: 0 4px 0 #444; border-color: #999;}
+</style>
+</head>
+<body>
+
+  <audio id="bg-music" loop>
+    <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="pop-sound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg" preload="auto"></audio>
+  <audio id="boom-sound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
+  <audio id="cat-sound" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" preload="auto"></audio>
+
+  <button id="music-btn" onclick="toggleMusic()">🔇</button>
+
+  <div id="menu" class="screen active">
+    <div class="characters">
+     <div class="cat"><img src="cat.png" style="width: 100px; filter: drop-shadow(0 0 10px #ffd700);"></div>
+<div class="mouse-menu"><img src="mouse.png" style="width: 60px; filter: drop-shadow(0 0 10px #ffd700);"></div>
+    <h1>Сундучок сокровищ чёрного кота</h1>
+    <p>Помоги кот
+у и мыши собрать все сокровища в 100 локациях!</p>
+    <button class="btn" onclick="showMap()">Играть</button>
+  </div>
+
+  <div id="map-screen" class="screen">
+    <h2>Карта приключений</h2>
+    <div id="level-grid"></div>
+    <button class="btn" style="margin-top: 20px;" onclick="showMenu()">В меню</button>
+  </div>
+
+  <div id="game-screen" class="screen">
+    <div id="game-hud">
+      <div class="hud-item"><span>Ходы</span><span class="hud-val" id="moves">25</span></div>
+      <div class="hud-item" id="goal">Цель: 🍎 x 20</div>
+      <div class="hud-item"><span>Уровень</span><span class="hud-val" id="level-num">1</span></div>
+      <div class="hud-item"><span>Монеты</span><span class="hud-val">🪙 <span id="coin-count">0</span></span></div>
+    </div>
+    
+    <div id="board-container">
+        <div id="floating-mouse">🐭</div>
+        <div id="board"></div>
+    </div>
+    
+    <div id="controls">
+      <button id="hammer-btn" class="action-btn" onclick="toggleHammer()">🔨<br><span style="font-size:14px;font
+-weight:bold;" id="hammer-count">3</span></button>
+      <button class="action-btn" onclick="shuffleBoard(true)" title="Перемешать">🔀</button>
+      <button class="btn" style="padding: 10px 20px;" onclick="showMap()">Выйти</button>
+      <button class="action-btn" onclick="openShop()">🛒</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div id="shop-modal">
+    <div id="shop-content">
+      <h3>🛒 Магазин</h3>
+      <p>Твой баланс: 🪙 <b id="shop-coins">0</b></p>
+      <hr style="border-color: #4a2c5a;">
+      <p>Купить 1 Молоток 🔨</p>
+      <p style="font-size: 14px; color: #ccc;">Цена: 50 монет</p>
+      <button class="buy-btn" id="buy-hammer-btn" onclick="buyHammer()">Купить</button>
+      <button class="btn" style="margin-top: 15px; background: #e74c3c; box-shadow: none; padding: 8px 20px; font-size: 14px;" onclick="closeShop()">Закрыть</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  const SIZE = 8;
+  const BASE_FRUITS = ['🍎','🍊','🍋','🍇','🍓','🫐'];
+  const LOCATIONS =
+ [
+    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1000&auto=format&fit=crop', 
+    'https://images.unsplash.com/photo-1448375240586-882707db888b?q=80&w=1000&auto=format&fit=crop', 
+    'https://images.unsplash.com/photo-1504198453319-5ce911bafcde?q=80&w=1000&auto=format&fit=crop', 
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000&auto=format&fit=crop'  
+  ];
+
+  const popSound = document.getElementById('pop-sound');
+  const boomSound = document.getElementById('boom-sound');
+  const catSound = document.getElementById('cat-sound');
+  const bgMusic = document.getElementById('bg-music');
+  const musicBtn = document.getElementById('music-btn');
+  let isMusicPlaying = false;
+
+  window.toggleMusic = function() {
+    if (isMusicPlaying) { bgMusic.pause(); musicBtn.textContent = '🔇'; } 
+    else { bgMusic.play().catch(e => console.log("Ожидание клика")); musicBtn.textContent = '🔊'; }
+    isMusicPlaying = !isMusicPlaying;
+  };
+
+  popSound.load(); boomSound.load();
+ catSound.load();
+
+  function getSafeItem(key, defaultVal) {
+    try { return localStorage.getItem(key) !== null ? localStorage.getItem(key) : defaultVal; }
+    catch(e) { return defaultVal; }
+  }
+  function setSafeItem(key, val) {
+    try { localStorage.setItem(key, val); } catch(e) {}
+  }
+
+  let hammers = parseInt(getSafeItem('catGameHammers', '3'));
+  let maxUnlocked = parseInt(getSafeItem('catGameMaxLevel', '1'));
+  let coins = parseInt(getSafeItem('catGameCoins', '0'));
+  if (isNaN(hammers)) hammers = 3;
+  if (isNaN(maxUnlocked)) maxUnlocked = 1;
+  if (isNaN(coins)) coins = 0;
+
+  let isHammerActive = false;
+  let grid = [];
+  let iceGrid = [];
+  let moves = 25;
+  let selected = null;
+  let busy = false;
+  let currentLevel = 1;
+  let targetFruit = '🍎';
+  let targetCount = 20;
+  let currentCount = 0;
+  let hintTimeout = null;
+  let hintCells = [];
+
+  const menuScreen = document.getElementById('menu');
+  const mapScreen = document.getElementById('map-screen');
+  const gameScreen = document.getElementById('
+game-screen');
+  const boardEl = document.getElementById('board');
+  const levelGrid = document.getElementById('level-grid');
+  const movesEl = document.getElementById('moves');
+  const msgEl = document.getElementById('msg');
+  const goalEl = document.getElementById('goal');
+  const levelNumEl = document.getElementById('level-num');
+  const hammerBtn = document.getElementById('hammer-btn');
+  const hammerCountEl = document.getElementById('hammer-count');
+  const coinCountEl = document.getElementById('coin-count');
+  const shopModal = document.getElementById('shop-modal');
+  const shopCoinsEl = document.getElementById('shop-coins');
+  const buyHammerBtn = document.getElementById('buy-hammer-btn');
+  const floatingMouse = document.getElementById('floating-mouse');
+
+  function getBaseType(cell) {
+    if (!cell) return null;
+    return cell.split('_')[0];
+  }
+
+  function updateHUD() {
+    movesEl.textContent = moves;
+    levelNumEl.textContent = currentLevel;
+    goalEl.textContent = `Цель: ${targetFruit} x ${Mat
+h.max(0, targetCount - currentCount)}`;
+    hammerCountEl.textContent = hammers;
+    coinCountEl.textContent = coins;
+    shopCoinsEl.textContent = coins;
+    
+    if (hammers <= 0) hammerBtn.disabled = true;
+    else hammerBtn.disabled = false;
+
+    if (coins >= 50) buyHammerBtn.disabled = false;
+    else buyHammerBtn.disabled = true;
+  }
+
+  window.openShop = function() { if (!busy) { shopModal.style.display = 'flex'; updateHUD(); } }
+  window.closeShop = function() { shopModal.style.display = 'none'; }
+  window.buyHammer = function() {
+    if (coins >= 50) {
+      coins -= 50; hammers++;
+      setSafeItem('catGameCoins', coins); setSafeItem('catGameHammers', hammers);
+      updateHUD(); msgEl.textContent = 'Куплен молоток!';
+      setTimeout(() => { if(msgEl.textContent === 'Куплен молоток!') msgEl.textContent = ''; }, 1500);
+    }
+  }
+
+  window.toggleHammer = function() {
+    if (hammers <= 0 || busy) return;
+    isHammerActive = !isHammerActive;
+    if (isHammerActive) {
+      hammerBtn.classList.add('act
+ive');
+      msgEl.textContent = 'Выбери фрукт, чтобы разбить его!';
+      selected = null; render();
+    } else {
+      hammerBtn.classList.remove('active');
+      msgEl.textContent = '';
+    }
+  };
+
+  window.showMenu = function() { 
+    menuScreen.classList.add('active'); mapScreen.classList.remove('active'); gameScreen.classList.remove('active'); 
+    clearTimeout(hintTimeout); floatingMouse.style.display = 'none';
+  };
+  window.showMap = function() { 
+    menuScreen.classList.remove('active'); gameScreen.classList.remove('active'); mapScreen.classList.add('active'); buildLevelMap(); 
+    clearTimeout(hintTimeout); floatingMouse.style.display = 'none';
+  };
+
+  window.startLevel = function(level) {
+    if (level > maxUnlocked) return;
+    currentLevel = level;
+    mapScreen.classList.remove('active');
+    gameScreen.classList.add('active');
+    
+    const locIndex = Math.floor((level - 1) / 10) % LOCATIONS.length;
+    gameScreen.style.background = `url('${LOCATIONS[locIndex]}') center/cover no-repeat`;
+
+   
+ moves = 20 + (level * 2); 
+    targetCount = 10 + (level * 2); 
+    currentCount = 0;
+    targetFruit = BASE_FRUITS[Math.floor(Math.random() * BASE_FRUITS.length)];
+    
+    updateHUD();
+    msgEl.textContent = 'Собирай 4 в ряд для Ракет!';
+    isHammerActive = false; hammerBtn.classList.remove('active');
+    busy = false; selected = null; hintCells = []; floatingMouse.style.display = 'none';
+    
+    iceGrid = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+    if (level >= 4) {
+        let numIce = Math.min(Math.floor(level * 1.5), 15);
+        for(let i=0; i<numIce; i++) {
+            iceGrid[Math.floor(Math.random()*SIZE)][Math.floor(Math.random()*SIZE)] = true;
+        }
+    }
+
+    createGrid();
+    let guard = 0;
+    while (!hasPossibleMoves() && guard++ < 50) createGrid();
+    render();
+    resetHintTimer();
+  };
+
+  function buildLevelMap() {
+    levelGrid.innerHTML = '';
+    for (let i = 1; i <= 100; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'level-btn';
+
+      btn.textContent = i;
+      if (i > maxUnlocked) btn.classList.add('locked');
+      else if (i < maxUnlocked) btn.classList.add('done');
+      btn.onclick = () => startLevel(i);
+      levelGrid.appendChild(btn);
+    }
+  }
+
+  function createGrid() {
+    grid = [];
+    for (let r = 0; r < SIZE; r++) {
+      grid[r] = [];
+      for (let c = 0; c < SIZE; c++) {
+        let f;
+        do { f = BASE_FRUITS[Math.floor(Math.random() * BASE_FRUITS.length)]; } while (
+          (c >= 2 && getBaseType(grid[r][c-1]) === f && getBaseType(grid[r][c-2]) === f) ||
+          (r >= 2 && getBaseType(grid[r-1][c]) === f && getBaseType(grid[r-2][c]) === f)
+        );
+        grid[r][c] = f;
+      }
+    }
+  }
+
+  function render() {
+    boardEl.innerHTML = '';
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.r = r; cell.dataset.c = c;
+        const val = grid[r][c];
+        if (val) {
+          c
+onst base = getBaseType(val);
+          if (val.includes('_bomb')) { cell.textContent = '💣'; cell.classList.add('special', 'bomb'); }
+          else if (val.includes('_rainbow')) { cell.textContent = '🌈'; cell.classList.add('special', 'rainbow'); }
+          else if (val.includes('_rocketH')) { cell.textContent = '🚀'; cell.classList.add('special', 'rocket-h'); cell.style.transform = 'rotate(0deg)'; }
+          else if (val.includes('_rocketV')) { cell.textContent = '🚀'; cell.classList.add('special', 'rocket-v'); cell.style.transform = 'rotate(90deg)'; }
+          else { cell.textContent = base; }
+        }
+        if (selected && selected.r === r && selected.c === c) cell.classList.add('sel');
+        if (iceGrid[r] && iceGrid[r][c]) {
+            const iceDiv = document.createElement('div');
+            iceDiv.className = 'ice-overlay'; iceDiv.textContent = '❄️'; cell.appendChild(iceDiv);
+        }
+        if (hintCells.some(hc => hc.r === r && hc.c === c)) cell.classList.add('hint');
+        boardEl.app
+endChild(cell);
+      }
+    }
+  }
+
+  // Поиск совпадений
+  function findMatches() {
+    const matched = new Set(); const matchInfo = [];
+    
+    // Горизонтали
+    for (let r = 0; r < SIZE; r++) {
+      let runStart = 0;
+      for (let c = 1; c <= SIZE; c++) {
+        let curr = (c < SIZE) ? getBaseType(grid[r][c]) : null;
+        let start = getBaseType(grid[r][runStart]);
+        if (curr && start && curr === start) continue;
+        const len = c - runStart;
+        if (len >= 3 && start) {
+          for (let k = runStart; k < c; k++) matched.add(r + ',' + k);
+          if (len === 4) matchInfo.push({ type: 'rocketH', r: r, c: runStart + 1, base: start });
+          if (len >= 5) matchInfo.push({ type: 'rainbow', r: r, c: runStart + 2, base: start });
+        }
+        runStart = c;
+      }
+    }
+    // Вертикали
+    for (let c = 0; c < SIZE; c++) {
+      let runStart = 0;
+      for (let r = 1; r <= SIZE; r++) {
+        let curr = (r < SIZE) ? getBaseType(grid[r][c]) : null;
+        let start = getBaseTyp
+e(grid[runStart][c]);
+        if (curr && start && curr === start) continue;
+        const len = r - runStart;
+        if (len >= 3 && start) {
+          for (let k = runStart; k < r; k++) matched.add(k + ',' + c);
+          if (len === 4) matchInfo.push({ type: 'rocketV', r: runStart + 1, c: c, base: start });
+          if (len >= 5) matchInfo.push({ type: 'rainbow', r: runStart + 2, c: c, base: start });
+        }
+        runStart = r;
+      }
+    }
+    
+    // Проверка на пересечение (крест) для Бомбы
+    let crossCenters = new Set();
+    matched.forEach(key => {
+        let [r, c] = key.split(',').map(Number);
+        let base = getBaseType(grid[r][c]);
+        if (!base) return;
+        
+        let hCount = 0, vCount = 0;
+        for (let k = c; k >= 0 && getBaseType(grid[r][k]) === base; k--) hCount++;
+        for (let k = c + 1; k < SIZE && getBaseType(grid[r][k]) === base; k++) hCount++;
+        for (let k = r; k >= 0 && getBaseType(grid[k][c]) === base; k--) vCount++;
+        for (let k = r + 1; k <
+ SIZE && getBaseType(grid[k][c]) === base; k++) vCount++;
+        
+        if (hCount >= 3 && vCount >= 3 && (hCount + vCount - 1) >= 5) {
+            let infoIndex = matchInfo.findIndex(m => m.r === r && m.c === c);
+            if (infoIndex === -1) {
+                 matchInfo.push({ type: 'bomb', r: r, c: c, base: base });
+                 crossCenters.add(r+','+c);
+            }
+        }
+    });
+
+    // Убираем ракеты, если на их месте должна быть бомба
+    for (let i = matchInfo.length - 1; i >= 0; i--) {
+        if (crossCenters.has(matchInfo[i].r + ',' + matchInfo[i].c) && matchInfo[i].type !== 'bomb') {
+            matchInfo.splice(i, 1);
+        }
+    }
+
+    return { matched, matchInfo };
+  }
+
+  function resolveBoard(callback, forcedMatches = null) {
+    let matched; let matchInfo = [];
+    if (forcedMatches) { matched = forcedMatches.matched; matchInfo = forcedMatches.matchInfo; } 
+    else { let res = findMatches(); matched = res.matched; matchInfo = res.matchInfo; }
+    
+    if (matched.size === 
+0) {
+      if (currentCount >= targetCount || moves <= 0) { busy = false; checkWinLose(); return; }
+      if (!hasPossibleMoves()) {
+        msgEl.textContent = 'Нет ходов — перемешиваем...';
+        setTimeout(() => { shuffleBoard(false); render(); resolveBoard(callback); }, 600);
+        return;
+      }
+      msgEl.textContent = ''; busy = false; if (callback) callback(); resetHintTimer(); return;
+    }
+
+    coins += Math.floor(matched.size / 3); setSafeItem('catGameCoins', coins); updateHUD();
+
+    let containsSpecial = false;
+    let currentMatched = Array.from(matched);
+    
+    // Активация спец-фишек
+    currentMatched.forEach(key => {
+      const [r, c] = key.split(',').map(Number);
+      const val = grid[r][c];
+      if (val && (val.includes('_bomb') || val.includes('_rainbow') || val.includes('_rocket'))) {
+        containsSpecial = true;
+        if (val.includes('_bomb')) {
+          for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) {
+             if(r+i>=0 && r+i<SIZE && c+j>=0 && c+j<SIZE) matche
+d.add((r+i)+','+(c+j));
+          }
+        } else if (val.includes('_rainbow')) {
+          let baseColor = getBaseType(val);
+          for(let i=0; i<SIZE; i++) for(let j=0; j<SIZE; j++) {
+             if(getBaseType(grid[i][j]) === baseColor) matched.add(i+','+j);
+          }
+        } else if (val.includes('_rocketH')) {
+          for(let j=0; j<SIZE; j++) matched.add(r+','+j);
+        } else if (val.includes('_rocketV')) {
+          for(let i=0; i<SIZE; i++) matched.add(i+','+c);
+        }
+      }
+    });
+
+    // Разбиваем лед
+    let iceToBreak = new Set();
+    matched.forEach(key => {
+        let [r, c] = key.split(',').map(Number);
+        [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+            let nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && iceGrid[nr][nc]) iceToBreak.add(nr+','+nc);
+        });
+    });
+    if (iceToBreak.size > 0) {
+        iceToBreak.forEach(key => { let [r, c] = key.split(',').map(Number); iceGrid[r][c] = false; });
+        set
+Timeout(() => { boomSound.currentTime=0; boomSound.play().catch(e=>{}); }, 50);
+    }
+
+    if (containsSpecial) { boomSound.currentTime=0; boomSound.play().catch(e=>{}); } 
+    else { popSound.currentTime=0; popSound.play().catch(e=>{}); }
+
+    matched.forEach(key => {
+      const [r, c] = key.split(',').map(Number);
+      if (getBaseType(grid[r][c]) === targetFruit) currentCount++;
+    });
+    updateHUD();
+
+    // Анимация взрыва
+    matched.forEach(key => {
+      const [r, c] = key.split(',').map(Number);
+      const el = boardEl.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+      if (el) el.classList.add('pop');
+    });
+
+    setTimeout(() => {
+      matched.forEach(key => { const [r, c] = key.split(',').map(Number); grid[r][c] = null; });
+      matchInfo.forEach(info => { 
+          let suffix = '_bomb';
+          if (info.type === 'rainbow') suffix = '_rainbow';
+          if (info.type === 'rocketH') suffix = '_rocketH';
+          if (info.type === 'rocketV') suffix = '_rocketV';
+          grid[in
+fo.r][info.c] = info.base + suffix; 
+      });
+      for (let c = 0; c < SIZE; c++) {
+        let write = SIZE - 1;
+        for (let r = SIZE - 1; r >= 0; r--) {
+          if (grid[r][c]) { grid[write][c] = grid[r][c]; if (write !== r) grid[r][c] = null; write--; }
+        }
+        for (let r = write; r >= 0; r--) grid[r][c] = BASE_FRUITS[Math.floor(Math.random() * BASE_FRUITS.length)];
+      }
+      render();
+      setTimeout(() => resolveBoard(callback), 150);
+    }, 250);
+  }
+
+  function hasPossibleMoves() {
+    const swapAndCheck = (r1,c1,r2,c2) => {
+      [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
+      const ok = findMatches().matched.size > 0;
+      [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]];
+      return ok;
+    };
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (c + 1 < SIZE && swapAndCheck(r,c,r,c+1)) return true;
+        if (r + 1 < SIZE && swapAndCheck(r,c,r+1,c)) return true;
+      }
+    }
+    return false;
+  }
+  
+  window
+.shuffleBoard = function(isManual) {
+    if (busy) return;
+    if (isManual) { msgEl.textContent = 'Перемешиваем!'; setTimeout(()=>msgEl.textContent='', 1500); }
+    createGrid(); let guard = 0; while (!hasPossibleMoves() && guard++ < 50) createGrid(); render();
+  }
+
+  function checkWinLose() {
+    if (currentCount >= targetCount) {
+      catSound.currentTime = 0; catSound.volume = 1.0; catSound.play().catch(e => {});
+      msgEl.textContent = '🎉 Мяу! Уровень пройден! +1 Молоток!';
+      if (currentLevel === maxUnlocked) { maxUnlocked++; setSafeItem('catGameMaxLevel', maxUnlocked); }
+      hammers++; setSafeItem('catGameHammers', hammers);
+      updateHUD();
+      setTimeout(() => { showMap(); }, 2500);
+    } else if (moves <= 0) {
+      msgEl.textContent = '😿 Ходы закончились!'; setTimeout(() => { startLevel(currentLevel); }, 2000);
+    }
+  }
+
+  function trySwap(r1, c1, r2, c2) {
+    if (busy || moves <= 0) return;
+    busy = true; clearTimeout(hintTimeout); hintCells = []; floatingMouse.style.display = 'n
+one';
+    
+    // Плавный свайп (визуальный эффект)
+    const cell1 = boardEl.querySelector(`.cell[data-r="${r1}"][data-c="${c1}"]`);
+    const cell2 = boardEl.querySelector(`.cell[data-r="${r2}"][data-c="${c2}"]`);
+    if(cell1 && cell2) { cell1.classList.add('swapping'); cell2.classList.add('swapping'); }
+    
+    setTimeout(() => {
+        let val1 = grid[r1][c1]; let val2 = grid[r2][c2];
+        [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]]; 
+        render();
+        
+        let matches = findMatches();
+        let isSpecial1 = val1 && val1.includes('_'); let isSpecial2 = val2 && val2.includes('_');
+        
+        if (matches.matched.size === 0 && !isSpecial1 && !isSpecial2) {
+          setTimeout(() => {
+            [grid[r1][c1], grid[r2][c2]] = [grid[r2][c2], grid[r1][c1]]; render();
+            msgEl.textContent = 'Так нельзя — нужен матч!';
+            setTimeout(() => { if (msgEl.textContent === 'Так нельзя — нужен матч!') msgEl.textContent = ''; }, 900);
+            busy = false; 
+resetHintTimer();
+          }, 150);
+          return;
+        }
+        moves--; updateHUD(); selected = null;
+        if (matches.matched.size === 0 && (isSpecial1 || isSpecial2)) {
+            matches.matched.add(r1 + ',' + c1); matches.matched.add(r2 + ',' + c2);
+        }
+        setTimeout(() => resolveBoard(() => { checkWinLose(); }, matches), 50);
+    }, 150); // Ждем, пока сработает визуальная анимация
+  }
+
+  function resetHintTimer() {
+    clearTimeout(hintTimeout); hintCells = []; floatingMouse.style.display = 'none'; render();
+    if (!busy && moves > 0) hintTimeout = setTimeout(showHint, 5000);
+  }
+
+  function showHint() {
+    if (busy || moves <= 0) return;
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        if (c + 1 < SIZE) {
+          [grid[r][c], grid[r][c+1]] = [grid[r][c+1], grid[r][c]];
+          if (findMatches().matched.size > 0) {
+            [grid[r][c], grid[r][c+1]] = [grid[r][c+1], grid[r][c]];
+            hintCells = [{r, c}, {r, c: c+1}]; render();
+ positionMouse(r, c); return;
+          }
+          [grid[r][c], grid[r][c+1]] = [grid[r][c+1], grid[r][c]];
+        }
+        if (r + 1 < SIZE) {
+          [grid[r][c], grid[r+1][c]] = [grid[r+1][c], grid[r][c]];
+          if (findMatches().matched.size > 0) {
+            [grid[r][c], grid[r+1][c]] = [grid[r+1][c], grid[r][c]];
+            hintCells = [{r, c}, {r: r+1, c}]; render(); positionMouse(r, c); return;
+          }
+          [grid[r][c], grid[r+1][c]] = [grid[r+1][c], grid[r][c]];
+        }
+      }
+    }
+  }
+  
+  function positionMouse(r, c) {
+      const cellEl = boardEl.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+      if (cellEl) {
+          floatingMouse.style.left = (cellEl.offsetLeft - 15) + 'px';
+          floatingMouse.style.top = (cellEl.offsetTop - 45) + 'px';
+          floatingMouse.style.display = 'block';
+      }
+  }
+
+  boardEl.addEventListener('pointerdown', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell || busy) return;
+    const r = +cell.dataset.r; const 
+c = +cell.dataset.c;
+    clearTimeout(hintTimeout); hintCells = []; floatingMouse.style.display = 'none'; render();
+
+    if (isHammerActive) {
+      if (hammers > 0) {
+        hammers--; updateHUD(); setSafeItem('catGameHammers', hammers);
+        isHammerActive = false; hammerBtn.classList.remove('active'); msgEl.textContent = '💥 Бам!';
+        boomSound.currentTime = 0; boomSound.play().catch(e=>{});
+        if (getBaseType(grid[r][c]) === targetFruit) currentCount++;
+        grid[r][c] = null; render(); busy = true;
+        setTimeout(() => {
+          for (let col = 0; col < SIZE; col++) {
+            let write = SIZE - 1;
+            for (let row = SIZE - 1; row >= 0; row--) {
+              if (grid[row][col]) { grid[write][col] = grid[row][col]; if (write !== row) grid[row][col] = null; write--; }
+            }
+            for (let row = write; row >= 0; row--) grid[row][col] = BASE_FRUITS[Math.floor(Math.random() * BASE_FRUITS.length)];
+          }
+          render(); resolveBoard(() => { checkWinLose
+(); });
+        }, 200);
+      }
+      return;
+    }
+
+    if (!selected) { selected = { r, c }; render(); return; }
+    const dr = Math.abs(selected.r - r); const dc = Math.abs(selected.c - c);
+    if (dr + dc === 1) {
+      const s = selected; selected = null; trySwap(s.r, s.c, r, c);
+    } else if (selected.r === r && selected.c === c) {
+      selected = null; render();
+    } else {
+      selected = { r, c }; render();
+    }
+  });
+
+  buildLevelMap();
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
